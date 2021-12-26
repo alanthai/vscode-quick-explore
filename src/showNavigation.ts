@@ -1,26 +1,20 @@
-import {Disposable, QuickPickItem, window} from 'vscode';
+import { Disposable, QuickPick, window } from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import {Dirent} from 'fs';
+import { Dirent } from 'fs';
+import { QuickPickItemWithValue } from './types';
 
-class FakeDirent {
-  constructor(public name: string, private type: 'dir' | 'file' = 'dir') {}
+let current: QuickPick<any> | undefined;
+let disposables: Disposable[] = [];
 
-  isDirectory() {
-    return this.type === 'dir';
-  }
-
-  isFile() {
-    return this.type === 'file';
-  }
-}
-
-type Value = Dirent | FakeDirent | undefined;
-type QuickPickItemWithValue = QuickPickItem & {value: Value};
-
-export async function showNavigation(root: string, relativePath: string) {
-  const items = await fs.readdir(relativePath, {withFileTypes: true});
-  const isRoot = root === relativePath;
+export async function showNavigation(
+  root: string,
+  relativePath: string,
+  aliases: QuickPickItemWithValue[]
+) {
+  const items = (await fs.readdir(relativePath, { withFileTypes: true })).sort(
+    sortFileTypes
+  );
 
   const filesAndFolders = items.map((item) => ({
     label: item.name,
@@ -28,26 +22,14 @@ export async function showNavigation(root: string, relativePath: string) {
     description: item.isDirectory() ? '/' : undefined,
   }));
 
-  const parentName = path.basename(path.dirname(relativePath));
-  const parent =
-    relativePath !== root
-      ? [
-          {
-            label: '..',
-            description: `${parentName}/`,
-            value: new FakeDirent('..'),
-          },
-        ]
-      : [];
-
-  const rootItem = isRoot
-    ? [{label: '~', description: '(Project root)', value: undefined}]
-    : [];
-
-  const all = [...filesAndFolders, ...parent, ...rootItem];
+  const all = [...filesAndFolders, ...aliases];
 
   const quickPick = window.createQuickPick();
-  const disposables: Disposable[] = [];
+  disposables = [];
+  if (current) {
+    current.dispose();
+  }
+  current = quickPick;
 
   return new Promise<QuickPickItemWithValue | undefined>((resolve) => {
     quickPick.title = path.relative(root, relativePath) || 'root';
@@ -56,8 +38,6 @@ export async function showNavigation(root: string, relativePath: string) {
 
     disposables.push(
       quickPick.onDidChangeSelection(([selection]) => {
-        disposables.forEach((d) => d.dispose());
-        console.log('selection', selection);
         resolve(selection as QuickPickItemWithValue);
       }),
       quickPick.onDidChangeValue((value) => {
@@ -69,11 +49,32 @@ export async function showNavigation(root: string, relativePath: string) {
           }
         }
       }),
-      quickPick.onDidHide(() => quickPick.dispose())
+      quickPick.onDidHide(() => {
+        resolve(undefined);
+      })
     );
     quickPick.show();
   }).then((value) => {
+    disposables.forEach((d) => d.dispose());
     quickPick.dispose();
+    current = undefined;
     return value;
   });
+}
+
+function sortFileTypes(a: Dirent, b: Dirent) {
+  return rankFileType(a) - rankFileType(b);
+}
+
+function rankFileType(dirent: Dirent) {
+  if (dirent.isDirectory()) {
+    return 0;
+  }
+  if (dirent.isSymbolicLink()) {
+    return 1;
+  }
+  if (dirent.isFile()) {
+    return 2;
+  }
+  return 3;
 }

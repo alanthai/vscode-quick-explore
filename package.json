@@ -1,6 +1,6 @@
 {
   "name": "quick-explore",
-  "displayName": "Folder Navigation like Terminal",
+  "displayName": "Quick Explore",
   "description": "Navigate your file explorer with keyboard navigation like the terminal",
   "version": "0.0.1",
   "engines": {
@@ -10,14 +10,41 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:quick-explore.navigate"
+    "onCommand:quick-explore.open"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "quick-explore.navigate",
-        "title": "Folder navigation (like terminal)"
+        "command": "quick-explore.open",
+        "title": "Quick Explore"
+      }
+    ],
+    "configuration": {
+      "title": "Quick Explore",
+      "properties": {
+        "quick-explore.startPath": {
+          "type": "string",
+          "default": "",
+          "description": "Specify the starting path when quick start opens. Relative path start at the root. Use \".\" for relative path of the active editor. Defaults to root - \"\""
+        },
+        "quick-explore.aliases": {
+          "type": "object",
+          "default": {
+            "~": {
+              "path": "",
+              "description": "Project root"
+            }
+          },
+          "description": "Specify aliases for commonly accessed paths. Default \"~\" for the project root directory."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "quick-extension.open",
+        "key": "ctrl+shift+q",
+        "mac": "cmd+shift+q"
       }
     ]
   },
@@ -30,7 +57,9 @@
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "vscode:package": "vsce package",
+    "vscode:publish": "vsce publish"
   },
   "devDependencies": {
     "@types/glob": "^7.1.4",
@@ -48,6 +77,7 @@
     "prettier": "^2.5.1",
     "ts-loader": "^9.2.5",
     "typescript": "^4.4.4",
+    "vsce": "^2.5.1",
     "webpack": "^5.52.1",
     "webpack-cli": "^4.8.0"
   }
